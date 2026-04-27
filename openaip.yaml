@@ -11,7 +11,7 @@ info:
     3. 개정 이력은 `/law/article-history`를 사용합니다.
 
 servers:
-  - url: https://law-gpt-action-production.up.railway.app
+  - url: https://law-gpt-action-vercel.vercel.app
     description: "Production"
 
 paths:
