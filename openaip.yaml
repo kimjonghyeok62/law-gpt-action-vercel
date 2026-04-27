@@ -1,0 +1,473 @@
+﻿openapi: 3.1.0
+info:
+  title: Korean Law Action Wrapper
+  version: 2.1.0
+  description: |
+    국가법령정보센터 기반 법령/판례/자치법규 조회 API입니다.
+
+    기본 흐름:
+    1. `/law/search`로 법령 식별자(mst, lawId)를 찾습니다.
+    2. `/law/text`로 조문을 조회합니다.
+    3. 개정 이력은 `/law/article-history`를 사용합니다.
+
+servers:
+  - url: https://law-gpt-action-production.up.railway.app
+    description: "Production"
+
+paths:
+  /:
+    get:
+      operationId: rootInfo
+      summary: API 루트 정보
+      responses:
+        '200':
+          description: "OK"
+
+  /health:
+    get:
+      operationId: healthCheck
+      summary: 헬스 체크
+      responses:
+        '200':
+          description: "OK"
+
+  /law/search:
+    post:
+      operationId: searchLaw
+      summary: 법령명 검색
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  description: "검색할 법령명 (예: 학원법)"
+              required: [query]
+      responses:
+        '200':
+          description: "검색 성공"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  query: { type: string }
+                  count: { type: integer }
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lawName: { type: string }
+                        lawId: { type: string }
+                        mst: { type: string }
+                        promulgationDate: { type: string }
+                        effectiveDate: { type: string }
+                        lawType: { type: string }
+
+  /law/text:
+    post:
+      operationId: getLawText
+      summary: 법령 조문 조회
+      description: "mst/lawId/lawName으로 법령을 찾고 jo로 조문을 조회합니다. 기본값은 관련 시행령/시행규칙 동시 조회이며, 응답 text는 Markdown 그대로 표시해야 합니다. includeRelated=false면 관련 법령 동시 조회를 끌 수 있습니다."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mst:
+                  type: string
+                  description: "법령일련번호"
+                lawId:
+                  type: string
+                  description: "법령ID"
+                lawName:
+                  type: string
+                  description: "법령명"
+                jo:
+                  type: string
+                  description: "조문 번호 (예: 제3조, 3, 제3조의2)"
+                includeRelated:
+                  type: boolean
+                  description: "false면 관련 시행령/시행규칙 동시 조회를 끌 수 있음"
+                efYd:
+                  type: string
+                  description: "시행일자 (YYYYMMDD)"
+      responses:
+        '200':
+          description: "조회 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /law/three-tier:
+    post:
+      operationId: getThreeTier
+      summary: 3단 비교(전문비교)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mst: { type: string }
+                lawId: { type: string }
+                knd:
+                  type: string
+                  enum: ['1', '2']
+                  description: "1 또는 2"
+      responses:
+        '200':
+          description: "조회 성공"
+
+  /law/ordinance/search:
+    post:
+      operationId: searchOrdinance
+      summary: 자치법규 검색
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                display:
+                  type: integer
+                  default: 20
+              required: [query]
+      responses:
+        '200':
+          description: "검색 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /law/ordinance/text:
+    post:
+      operationId: getOrdinanceText
+      summary: 자치법규 조문 조회
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ordinSeq:
+                  type: string
+                jo:
+                  type: string
+              required: [ordinSeq]
+      responses:
+        '200':
+          description: "조회 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /law/precedent/search:
+    post:
+      operationId: searchPrecedents
+      summary: 판례 검색
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                court:
+                  type: string
+                display:
+                  type: integer
+                  default: 20
+                page:
+                  type: integer
+                  default: 1
+              required: [query]
+      responses:
+        '200':
+          description: "검색 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /law/precedent/text:
+    post:
+      operationId: getPrecedentText
+      summary: 판례 전문 조회
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: "판례일련번호"
+              required: [id]
+      responses:
+        '200':
+          description: "조회 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /law/history:
+    post:
+      operationId: getLawHistory
+      summary: 법령 연혁 조회
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lawName:
+                  type: string
+                display:
+                  type: integer
+                  default: 50
+              required: [lawName]
+      responses:
+        '200':
+          description: "조회 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /law/history/text:
+    post:
+      operationId: getHistoricalLawText
+      summary: 과거 버전 조문 조회
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mst:
+                  type: string
+                jo:
+                  type: string
+              required: [mst]
+      responses:
+        '200':
+          description: "조회 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /law/annex:
+    post:
+      operationId: getLawAnnex
+      summary: 별표/서식 조회
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lawName:
+                  type: string
+                knd:
+                  type: string
+                  enum: ['1', '2', '3', '4', '5']
+                bylSeq:
+                  type: string
+                annexNo:
+                  type: string
+              required: [lawName]
+      responses:
+        '200':
+          description: "조회 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /law/article-history:
+    post:
+      operationId: getArticleHistory
+      summary: 조문별 개정 이력 조회
+      description: |
+        조문 개정 이력을 최신순으로 조회합니다.
+        - 날짜를 생략하면 전체 이력에서 최신순으로 반환합니다.
+        - recentYears 또는 periodText(예: 최근 3년, 최근 몇년)로 기간 자동 추론이 가능합니다.
+        - 응답에는 개정일/시행일/MST가 포함됩니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lawName:
+                  type: string
+                  description: "법령명 (lawId 대신 사용 가능)"
+                lawId:
+                  type: string
+                  description: "법령ID (lawName 대신 사용 가능)"
+                jo:
+                  type: string
+                  description: "특정 조문 필터 (예: 제38조)"
+                fromRegDt:
+                  type: string
+                  description: "조회 시작일 (YYYYMMDD)"
+                toRegDt:
+                  type: string
+                  description: "조회 종료일 (YYYYMMDD)"
+                recentYears:
+                  type: integer
+                  description: "최근 N년 자동 조회 (예: 3)"
+                periodText:
+                  type: string
+                  description: "자연어 기간 (예: 최근 3년, 최근 몇년)"
+                limit:
+                  type: integer
+                  description: "최신순으로 보여줄 최대 건수 (기본 10, 최대 50)"
+      responses:
+        '200':
+          description: "조회 성공"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextResponse'
+
+  /gov/assistant:
+    post:
+      operationId: govAssistant
+      summary: 공무원 질의 지원 (자동분류/관할체크/출처강제)
+      description: |
+        공무원 질의를 자동 분류하고, 관련 법령 및 내부 기준을 함께 반환합니다.
+        - question: 민원/업무 질문
+        - internalRules: 내부 기준 배열(문자열 또는 {title, content})
+        - maxResults: 관련 법령 최대 개수
+
+        항상 asOfDate(기준일) 및 sources(출처)를 반환합니다.
+        출처가 없으면 요약을 생성하지 않습니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                question:
+                  type: string
+                internalRules:
+                  type: array
+                  items:
+                    oneOf:
+                      - type: string
+                      - type: object
+                        properties:
+                          title: { type: string }
+                          content: { type: string }
+                maxResults:
+                  type: integer
+              required: [question]
+      responses:
+        '200':
+          description: "처리 결과"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  asOfDate: { type: string }
+                  sourceRequired: { type: boolean }
+                  classification: { type: string }
+                  summary: { type: string }
+                  jurisdiction:
+                    type: object
+                  laws:
+                    type: array
+                    items:
+                      type: object
+                  internalRuleMatches:
+                    type: array
+                    items:
+                      type: object
+                  sources:
+                    type: array
+                    items:
+                      type: object
+
+components:
+  schemas:
+    TextResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        asOfDate:
+          type: string
+          description: "응답 기준일 (YYYY-MM-DD)"
+        mustDisplayVerbatim:
+          type: boolean
+          description: "true면 text를 요약/재작성하지 말고 그대로 표시"
+        mustShowLinks:
+          type: boolean
+          description: "true면 링크 섹션을 반드시 함께 표시"
+        displayPolicy:
+          type: string
+          description: "출력 정책 (예: verbatim_markdown)"
+        responseFormat:
+          type: string
+          description: "text 포맷 (예: markdown)"
+        text:
+          type: string
+          description: "마크다운 본문. 조문 설명 뒤에 링크 섹션이 포함된다."
+        quickLinks:
+          type: array
+          description: "링크 노출용 요약 목록"
+          items:
+            type: object
+            properties:
+              kind: { type: string }
+              url: { type: string }
+        links:
+          type: object
+          properties:
+            search: { type: string }
+            direct: { type: string }
+            articleSearch: { type: string }
+            articleDirect: { type: string }
+            relatedFetched:
+              type: boolean
+            delegated:
+              type: array
+              items:
+                type: object
+                properties:
+                  kind: { type: string }
+                  lawName: { type: string }
+                  jo: { type: string }
+                  search: { type: string }
+                  direct: { type: string }
+                  articleSearch: { type: string }
+                  articleDirect: { type: string }
